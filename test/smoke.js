@@ -278,6 +278,49 @@ await ta("收敛判定认可 'idle — 原因' 这种写法", async () => {
   assert.equal(snap.converged, true);
 });
 
+await ta("离线替身是有界的：不会无限重复同一个角度", async () => {
+  // Regression: an earlier scripted runner only went idle once its neighbours
+  // did, which never happens while every agent is busy writing. A 6-agent
+  // cluster logged 925 lines instead of ~24. The stand-in must be finite by
+  // construction, independent of what peers do.
+  const root = tmp();
+  const ac = new AbortController();
+  const angles = ["a", "b", "c", "d", "e"];
+  await startCluster({
+    root, clusterId: "bounded", concurrency: 6, direction: "x",
+    config: { algorithm: "mesh", neighbourRadius: 1, swarmK: 2, autopause: true },
+    runner: scriptedRunner({ angles }),
+    signal: ac.signal, promptDir: path.resolve("prompts"), staggerMs: 0,
+  });
+  const p2 = clusterPaths(root, "bounded", 6);
+  let total = 0;
+  for (let i = 0; i < 6; i++) {
+    const lines = fs.readFileSync(p2.logOf(i), "utf8").trim().split("\n").filter(Boolean);
+    total += lines.length;
+    assert.ok(lines.length <= 6, `agent-${i} 写了 ${lines.length} 行，应远小于 6`);
+  }
+  assert.ok(total <= 30, `日志共 ${total} 行，应远小于 925`);
+  const snap = snapshot(root, "bounded", 6);
+  assert.equal(snap.converged, true, "应达成收敛");
+});
+
+await ta("离线替身产出真实的差异化产物", async () => {
+  const root = tmp();
+  const ac = new AbortController();
+  const angles = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"];
+  await startCluster({
+    root, clusterId: "arts", concurrency: 6, direction: "x",
+    config: { algorithm: "mesh", neighbourRadius: 1, swarmK: 2, autopause: true },
+    runner: scriptedRunner({ angles }),
+    signal: ac.signal, promptDir: path.resolve("prompts"), staggerMs: 0,
+  });
+  const files = fs.readdirSync(path.join(root, "arts", "environment"));
+  assert.ok(files.length >= 4, `至少应有 4 个不同产物，实际 ${files.length}: ${files}`);
+  for (const f of files) {
+    assert.ok(fs.readFileSync(path.join(root, "arts", "environment", f), "utf8").length > 0, `${f} 不应为空`);
+  }
+});
+
 await ta("carry-over control: a previous run's artifacts are archived", async () => {
   const root = tmp();
   const ac = new AbortController();

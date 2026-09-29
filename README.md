@@ -206,7 +206,7 @@ the differential run will flag the divergence and this port can follow.
 
 ```bash
 npm test          # everything
-npm run smoke     # coordination invariants, 28 checks
+npm run smoke     # coordination invariants, 30 checks
 npm run diff      # differential vs the AWS source, 1272 input comparisons
 npm run resilience# retry, concurrency limiting, truncation detection
 npm run runner    # OpenAI-compatible wire protocol against a mock server

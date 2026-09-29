@@ -193,35 +193,31 @@ export function openaiRunner({
  * embedded in the prompt, picks an angle nobody has taken, and eventually
  * goes idle — so the full convergence path can be exercised without a model.
  */
-export function scriptedRunner({ angles = [] } = {}) {
-  return async function run({ prompt, iteration, agentIndex }) {
-    // What the visible neighbours already produced, read straight out of the
-    // prompt the loop assembled. Only the angled agents' own result text is
-    // matched, so an agent can tell whether an angle is genuinely covered
-    // rather than merely mentioned by a peer's next_intent.
-    const covered = new Set();
-    // Neighbour lines look like:
-    //   - agent-1 [iteration 0, action=write topologies]: produced notes on topologies  -> next_intent: read
-    for (const m of prompt.matchAll(/\]: (produced notes on [^\n]*?) {2}-> next_intent:/g)) {
-      covered.add(m[1].replace(/^produced notes on\s*/i, "").trim().toLowerCase());
-    }
-    const idleNeighbours = (prompt.match(/action=idle\]/gi) || []).length;
+export function scriptedRunner({ angles = [], maxContributions } = {}) {
+  // Per-agent state. The offline stand-in must be finite by construction:
+  // an earlier version depended on neighbours going idle, which never happens
+  // when every agent is busy writing, and it spun for hundreds of iterations.
+  const contributed = new Map();
+  const cap = maxContributions ?? Math.max(1, Math.ceil(angles.length / 2));
 
-    const angle = angles.find((a) => !covered.has(a.toLowerCase()));
-    // Once every visible angle is covered, or enough neighbours have already
-    // gone idle, the correct move is to abstain — that is what lets the
-    // cluster converge instead of churning.
-    if (angle && idleNeighbours === 0) {
+  return async function run({ agentIndex }) {
+    const n = contributed.get(agentIndex) ?? 0;
+    if (angles.length === 0 || n >= cap) {
       return JSON.stringify({
-        action: `write ${angle}`,
-        result: `produced notes on ${angle}`,
-        next_intent: "read neighbours and take the next uncovered angle",
+        action: "idle",
+        result: "coverage looks complete across visible neighbours; nothing high-value left to add",
+        next_intent: "remain idle unless the direction changes",
       });
     }
+    // Each agent takes a different slice of the angle list, so the cluster
+    // covers the space rather than duplicating one angle six times.
+    const angle = angles[(agentIndex + n * 3) % angles.length];
+    contributed.set(agentIndex, n + 1);
     return JSON.stringify({
-      action: "idle",
-      result: "coverage looks complete across visible neighbours; nothing high-value left to add",
-      next_intent: "remain idle unless the direction changes",
+      action: `write ${angle}`,
+      result: `produced notes on ${angle}`,
+      next_intent: "read neighbours and take the next angle",
+      artifact: { name: `${angle}.md`, content: `# ${angle}\n\nNotes on ${angle} from agent ${agentIndex}.\n` },
     });
   };
 }
