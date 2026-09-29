@@ -1,0 +1,10 @@
+# Generated cluster state — never commit run artifacts
+clusters/
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store

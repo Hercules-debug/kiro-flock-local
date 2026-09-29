@@ -1,0 +1,19 @@
+{
+  "name": "kiro-flock-local",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local port of aws-samples/sample-kiro-flock: self-organizing agent clusters with no orchestrator",
+  "bin": {
+    "flock": "src/cli.js"
+  },
+  "scripts": {
+    "demo": "node src/cli.js run --cluster demo --agents 8 --algorithm mesh --scripted --angles failure-modes,coordination-topologies,scaling-laws,economics,open-questions,stigmergy",
+    "smoke": "node test/smoke.js",
+    "diff": "node test/diff/topology-diff.js",
+    "resilience": "node test/resilience.js",
+    "runner": "node test/openai-runner.js",
+    "test": "node test/smoke.js && node test/diff/topology-diff.js && node test/openai-runner.js && node test/resilience.js",
+    "watch": "node src/cli.js watch --cluster demo --agents 8"
+  }
+}
